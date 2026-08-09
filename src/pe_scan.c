@@ -958,7 +958,7 @@ int uwd_pe_pdb_identity(const void *data,
     size_t index;
     int found = 0;
     UwdPdbIdentity candidate;
-    UwdPdbIdentity selected;
+    UwdPdbIdentity selected = {0};
 
     if (identity == NULL) {
         return uwd_fail(error, error_capacity, "invalid argument");
