@@ -3,7 +3,7 @@
 ## 2.0.0-dev (2026)
 
 - Replaced the unreproducible Delphi/VCL installer as the primary UI with a
-  C11 console application powered by the Universal-TUI module.
+  strict ISO C99 console application powered by the Universal-TUI module.
 - Replaced the default ExplorerFrame COM proxy with a fail-closed, current-
   session memory backend. The legacy source remains for historical reference.
 - Added exact Microsoft-PDB resolution and live/disk byte verification. An
@@ -14,6 +14,8 @@
   state, and reversible per-user startup.
 - Added CMake, PE-parser bounds tests, exact-PDB integration checks, and native
   Windows x64/ARM64 GitHub Actions.
+- Added an authoritative `-std=c99 -pedantic-errors` CI gate; Visual Studio
+  remains a compatibility build because MSVC does not expose a C99 mode.
 
 ## 1.0.0.6 (2015)
 

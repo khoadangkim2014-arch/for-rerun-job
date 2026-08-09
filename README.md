@@ -33,7 +33,7 @@ The original Delphi installer and ExplorerFrame proxy remain in `installer/`
 and `proxy/` for historical reference only. They are excluded from the modern
 build. The new implementation:
 
-- uses a native C11 console executable and Universal-TUI as the main UI;
+- uses a strict ISO C99 console executable and Universal-TUI as the main UI;
 - reads the real OS build with `RtlGetVersion` and the process architecture with
   `IsWow64Process2`;
 - identifies the current session's Explorer and its loaded `shell32.dll` rather
@@ -77,15 +77,23 @@ Requirements:
 - Windows 10/11 SDK;
 - CMake 3.24 or newer.
 
+The source-language contract is strict ISO C99. GNU and Clang GNU-driver builds
+disable language extensions and treat ISO violations as errors with
+`-std=c99 -pedantic-errors`. MSVC does not provide a C99 mode, so Visual Studio
+uses `/std:c11` only as its narrowest conforming C front end; the dedicated
+MinGW CI build is the C99 conformance gate. The project does not use C11
+features.
+
 ```powershell
 cmake -S . -B build -A x64
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-For ARM64, configure with `-A ARM64`. GitHub Actions uses native x64 and ARM64
-Windows runners. Both execute the PE bounds tests and inspect their own
-`shell32.dll` read-only, including exact Microsoft-PDB symbol resolution.
+For ARM64, configure with `-A ARM64`. GitHub Actions runs a strict ISO C99
+MinGW build plus native MSVC x64 and ARM64 builds. All execute the PE bounds
+tests and inspect their own `shell32.dll` read-only, including exact
+Microsoft-PDB symbol resolution.
 Release qualification on the target Windows families still requires
 real-machine Diagnostics and Dry run checks.
 

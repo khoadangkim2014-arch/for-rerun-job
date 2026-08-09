@@ -10,7 +10,7 @@ if(NOT WIN32)
     message(FATAL_ERROR "Universal Watermark Disabler builds only on Windows.")
 endif()
 
-set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -20,7 +20,7 @@ add_library(universal_tui STATIC
 target_include_directories(universal_tui PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/universal-tui")
 set_target_properties(universal_tui PROPERTIES
-    C_STANDARD 11
+    C_STANDARD 99
     C_STANDARD_REQUIRED YES
     C_EXTENSIONS NO)
 
@@ -49,8 +49,11 @@ target_link_libraries(uwd PRIVATE
     winhttp)
 
 if(MSVC)
-    target_compile_options(universal_tui PRIVATE /W3 /utf-8)
-    target_compile_options(uwd PRIVATE /W4 /WX /sdl /guard:cf /utf-8)
+    # MSVC has no C99 dialect switch. /std:c11 is its narrowest conforming C
+    # front end; the MinGW CI job is the authoritative strict-C99 gate.
+    target_compile_options(universal_tui PRIVATE /std:c11 /W3 /utf-8)
+    target_compile_options(uwd PRIVATE
+        "$<$<COMPILE_LANGUAGE:C>:/std:c11;/W4;/WX;/sdl;/guard:cf;/utf-8>")
     target_link_libraries(uwd PRIVATE delayimp)
     target_link_options(uwd PRIVATE
         /guard:cf
@@ -64,8 +67,10 @@ if(MSVC)
         target_link_options(uwd PRIVATE /CETCOMPAT)
     endif()
 else()
-    target_compile_options(universal_tui PRIVATE -Wall -Wextra -Wpedantic)
-    target_compile_options(uwd PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(universal_tui PRIVATE
+        -Wall -Wextra -Wpedantic -pedantic-errors)
+    target_compile_options(uwd PRIVATE
+        "$<$<COMPILE_LANGUAGE:C>:-Wall;-Wextra;-Wpedantic;-pedantic-errors;-Wconversion;-Wsign-conversion;-Wformat=2;-Werror>")
     if(MINGW)
         target_link_options(uwd PRIVATE -municode)
     endif()
@@ -78,11 +83,16 @@ if(BUILD_TESTING)
         src/pe_scan.c)
     target_include_directories(pe_scan_tests PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_compile_definitions(pe_scan_tests PRIVATE
+        _CRT_SECURE_NO_WARNINGS)
     if(MSVC)
-        target_compile_options(pe_scan_tests PRIVATE /W4 /WX /sdl /guard:cf /utf-8)
+        target_compile_options(pe_scan_tests PRIVATE
+            /std:c11 /W4 /WX /sdl /guard:cf /utf-8)
         target_link_options(pe_scan_tests PRIVATE /guard:cf /DYNAMICBASE /NXCOMPAT)
     else()
-        target_compile_options(pe_scan_tests PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(pe_scan_tests PRIVATE
+            -Wall -Wextra -Wpedantic -pedantic-errors
+            -Wconversion -Wsign-conversion -Wformat=2 -Werror)
     endif()
     add_test(NAME pe_scan_bounds COMMAND pe_scan_tests)
 
@@ -108,7 +118,7 @@ if(BUILD_TESTING)
         winhttp)
     if(MSVC)
         target_compile_options(symbol_resolver_tests PRIVATE
-            /W4 /WX /sdl /guard:cf /utf-8)
+            /std:c11 /W4 /WX /sdl /guard:cf /utf-8)
         target_link_libraries(symbol_resolver_tests PRIVATE delayimp)
         target_link_options(symbol_resolver_tests PRIVATE
             /guard:cf
@@ -120,10 +130,13 @@ if(BUILD_TESTING)
         if(CMAKE_GENERATOR_PLATFORM STREQUAL "x64")
             target_link_options(symbol_resolver_tests PRIVATE /CETCOMPAT)
         endif()
-    elseif(MINGW)
+    else()
         target_compile_options(symbol_resolver_tests PRIVATE
-            -Wall -Wextra -Wpedantic)
-        target_link_options(symbol_resolver_tests PRIVATE -municode)
+            -Wall -Wextra -Wpedantic -pedantic-errors
+            -Wconversion -Wsign-conversion -Wformat=2 -Werror)
+        if(MINGW)
+            target_link_options(symbol_resolver_tests PRIVATE -municode)
+        endif()
     endif()
 endif()
 

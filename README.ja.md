@@ -27,7 +27,7 @@ fail-closed（無変更）になります。
 旧DelphiインストーラーとExplorerFrameプロキシは履歴参照用に残していますが、
 新ビルドからは除外しました。
 
-- C11製の単一コンソールEXEへ移行し、`Universal-TUI` を主UI化
+- Strict ISO C99準拠の単一コンソールEXEへ移行し、`Universal-TUI` を主UI化
 - `RtlGetVersion` と `IsWow64Process2` でOS・x64/ARM64を正しく識別
 - 現在のセッションのExplorerと、実際にロード中の `shell32.dll` を特定
 - 一致するMicrosoft PDB GUID/ageと正確なsymbolを必須化し、ロード済みPEとディスク双方で検証
@@ -60,16 +60,22 @@ x64の診断表示だけです。
 Visual Studio 2022、Desktop development with C++、Windows 10/11 SDK、
 CMake 3.24以降が必要です。
 
+ソース言語の契約はStrict ISO C99です。GNU、およびGNU形式のClangでは言語拡張を無効化し、
+`-std=c99 -pedantic-errors` でISO違反をエラーにします。MSVCにはC99モードが
+ないため、Visual Studioビルドだけは最小の準拠Cフロントエンドとして
+`/std:c11` を使用します。C99準拠の判定は専用MinGW CIが担当し、プロジェクト
+自体はC11機能を使用しません。
+
 ```powershell
 cmake -S . -B build -A x64
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-ARM64は `-A ARM64` を指定します。GitHub Actionsではnative x64/ARM64 runnerを使い、
-両方で境界値テスト、`shell32.dll` の読み取り専用検査、正確なMicrosoft PDB symbol
-解決を実行します。リリース判定には、対象Windows実機でのDiagnosticsとDry runが
-別途必要です。
+ARM64は `-A ARM64` を指定します。GitHub ActionsではStrict ISO C99のMinGWビルドと
+native MSVC x64/ARM64ビルドを実行します。すべてで境界値テスト、`shell32.dll` の
+読み取り専用検査、正確なMicrosoft PDB symbol解決を実行します。リリース判定には、
+対象Windows実機でのDiagnosticsとDry runが別途必要です。
 
 ## 使い方
 

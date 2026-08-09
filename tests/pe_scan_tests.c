@@ -488,13 +488,7 @@ static int run_shell32_smoke_test(const char *path)
     uint32_t function_rva;
     char error[256];
 
-#if defined(_MSC_VER)
-    if (fopen_s(&file, path, "rb") != 0) {
-        file = NULL;
-    }
-#else
     file = fopen(path, "rb");
-#endif
     if (file == NULL) {
         fprintf(stderr, "cannot open shell32 image: %s\n", path);
         return -1;

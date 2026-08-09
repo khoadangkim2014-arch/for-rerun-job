@@ -172,7 +172,7 @@ static int run_tui(int ascii_mode)
     int result;
 
     if (build_config_path(config_path, sizeof(config_path)) != 0) {
-        (void)strcpy_s(config_path, sizeof(config_path), "uwd.config");
+        memcpy(config_path, "uwd.config", sizeof("uwd.config"));
     }
 
     ZeroMemory(&app, sizeof(app));
