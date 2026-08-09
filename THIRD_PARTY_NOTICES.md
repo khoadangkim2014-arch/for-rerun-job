@@ -7,10 +7,12 @@
 - License: Apache License 2.0
 - Local copy: `third_party/universal-tui`
 
-The upstream repository was private when this public fork was prepared.
-`utui.c`, `utui.h`, its README, and its unmodified license are vendored so a
-normal clone and GitHub Actions build remain reproducible. The UWD integration
-code is separate and does not relicense Universal-TUI under MIT.
+The upstream repository was private when this public fork was prepared. Its
+README and unmodified license are vendored together with `utui.c` and `utui.h`
+so a normal clone and GitHub Actions build remain reproducible. The two source
+files carry prominent notices for UWD's opt-in save-and-exit behavior and mouse
+exit-result propagation. These local changes remain Apache-2.0 licensed and do
+not relicense Universal-TUI under MIT.
 
 ## UWD3 structural-locator acknowledgement
 

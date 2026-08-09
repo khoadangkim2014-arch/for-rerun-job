@@ -12,6 +12,9 @@
  *   Consumer: define a UtItem tree + a UtApp, call ut_main() from main().
  *
  * License: Apache-2.0.
+ *
+ * Modified for Universal Watermark Disabler on 2026-08-09: added the
+ * opt-in UtApp.exit_after_save application behavior.
  */
 #ifndef UTUI_H
 #define UTUI_H
@@ -76,6 +79,7 @@ typedef struct {
     const char *app_name;       /* shown by --version (NULL => "utui")          */
     const char *saved_epilogue; /* printed after a saved exit (NULL => none)    */
     int   ascii;                /* 1 force ASCII, 0 force Unicode, <0 auto      */
+    int   exit_after_save;      /* 1 => successful Save exits with result 1     */
 } UtApp;
 
 /*

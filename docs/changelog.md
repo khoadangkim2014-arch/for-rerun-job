@@ -16,6 +16,8 @@
   Windows x64/ARM64 GitHub Actions.
 - Added an authoritative `-std=c99 -pedantic-errors` CI gate; Visual Studio
   remains a compatibility build because MSVC does not expose a C99 mode.
+- Fixed the Universal-TUI flow so a successful UWD Save exits and executes the
+  selected action, and mouse clicks honor the Exit result.
 
 ## 1.0.0.6 (2015)
 

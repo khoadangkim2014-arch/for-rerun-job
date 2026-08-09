@@ -14,6 +14,9 @@
  *   Dependency : none.  Only libc and the OS terminal API (no ncurses).
  *
  *   License: Apache-2.0.
+ *
+ * Modified for Universal Watermark Disabler on 2026-08-09: honor the opt-in
+ * exit-after-save mode and propagate mouse-button exit results.
  */
 #if defined(_WIN32)
 #  define WIN32_LEAN_AND_MEAN
@@ -1439,7 +1442,7 @@ static int exit_flow(void)
 
 /* -------------------------------------------------- Select 動作 */
 
-static void save_as(void)
+static int save_as(void)
 {
     static char fn[128];
     if (!fn[0]) snprintf(fn, sizeof fn, "%s", g_app->config_file);
@@ -1450,8 +1453,10 @@ static void save_as(void)
             char mb[192];
             snprintf(mb, sizeof mb, "Configuration written to %s", fn);
             msgbox(" ", mb);
+            return 1;
         } else msgbox("Error", "Can't create file!");
     }
+    return 0;
 }
 static void load_as(void)
 {
@@ -1526,22 +1531,27 @@ static int do_button(int b)   /* 戻り値 1=終了 */
     case 0: activate_select(); break;
     case 1: if (g_depth) g_depth--; else if (exit_flow()) return 1; break;
     case 2: if (fr->menu->nchild) show_help(&fr->menu->children[fr->sel]); break;
-    case 3: save_as(); break;
+    case 3:
+        if (save_as() && g_app->exit_after_save) {
+            g_saved_on_exit = 1;
+            return 1;
+        }
+        break;
     case 4: load_as(); break;
     default: break;
     }
     return 0;
 }
 
-static void handle_mouse(Key *k)
+static int handle_mouse(Key *k)
 {
     NavFrame *fr = &g_stack[g_depth];
-    if (k->mb == 64) { fr->sel = next_sel(fr->menu, fr->sel, -1); return; }
-    if (k->mb == 65) { fr->sel = next_sel(fr->menu, fr->sel, +1); return; }
-    if (!k->mpress) return;
+    if (k->mb == 64) { fr->sel = next_sel(fr->menu, fr->sel, -1); return 0; }
+    if (k->mb == 65) { fr->sel = next_sel(fr->menu, fr->sel, +1); return 0; }
+    if (!k->mpress) return 0;
     if ((k->mb & 3) == 0) {
         int b = hit_button(k->mx, k->my);
-        if (b >= 0) { fr->btn = b; do_button(b); return; }
+        if (b >= 0) { fr->btn = b; return do_button(b); }
         if (k->my >= g_list_y && k->my < g_list_y + g_list_h &&
             k->mx >= g_list_x && k->mx < g_list_x + g_list_w) {
             int idx = g_list_top + (k->my - g_list_y);
@@ -1551,6 +1561,7 @@ static void handle_mouse(Key *k)
             }
         }
     }
+    return 0;
 }
 
 static void main_loop(void)
@@ -1607,7 +1618,7 @@ static void main_loop(void)
             if (m->nchild) show_help(&m->children[fr->sel]);
             break;
         case '/': do_search(); break;
-        case K_MOUSE: handle_mouse(&k); break;
+        case K_MOUSE: if (handle_mouse(&k)) return; break;
         default:
             if (k.type >= 32 && k.type < 127) hotkey_jump(fr, k.type);
             break;

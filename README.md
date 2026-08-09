@@ -143,8 +143,10 @@ multi-session Windows hosts cannot overwrite another session's recovery data.
 `third_party/universal-tui` is a pinned vendored module from
 `ayanami770/Universal-TUI` commit
 `419fef2e89e68873fe969ecbdb02d8cfa2331ba3`. The upstream repository is
-currently private. Vendoring keeps this public fork and its CI reproducible;
-the directory can be converted to a git submodule after upstream is public.
+currently private. Vendoring keeps this public fork and its CI reproducible.
+The source carries marked local fixes for opt-in Save-and-exit behavior and
+mouse Exit propagation; these changes should be upstreamed before converting
+the directory to a pinned git submodule.
 
 Universal-TUI is Apache-2.0 licensed. See
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the component's

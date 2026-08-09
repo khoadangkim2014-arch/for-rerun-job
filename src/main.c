@@ -186,6 +186,7 @@ static int run_tui(int ascii_mode)
     app.app_name = "uwd";
     app.saved_epilogue = NULL;
     app.ascii = ascii_mode;
+    app.exit_after_save = 1;
 
     result = ut_run(&root, &app);
     if (result < 0) {

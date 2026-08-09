@@ -120,7 +120,8 @@ multi-session Windowsでも別sessionの復元情報を上書きしません。
 `third_party/universal-tui` は `ayanami770/Universal-TUI` のcommit
 `419fef2e89e68873fe969ecbdb02d8cfa2331ba3` を固定したvendored moduleです。
 上流が現在privateのため、公開フォークとCIを再現可能にする目的でvendorしています。
-上流を公開した後は同じディレクトリをgit submoduleへ変更できます。
+Save成功時の任意終了とマウスExit伝播について、変更通知付きのlocal fixを含みます。
+git submoduleへ変更する前に、この差分を上流へ反映する必要があります。
 
 Universal-TUIはApache-2.0、本体はMITです。詳細は
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) を参照してください。

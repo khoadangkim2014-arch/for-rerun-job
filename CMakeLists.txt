@@ -96,6 +96,26 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME pe_scan_bounds COMMAND pe_scan_tests)
 
+    # Exercise the real Universal-TUI event loop through its private input
+    # queue. The test includes the vendored implementation directly so the
+    # production library does not need a public test-only API.
+    add_executable(utui_flow_tests
+        tests/utui_flow_tests.c)
+    target_include_directories(utui_flow_tests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/universal-tui")
+    target_compile_definitions(utui_flow_tests PRIVATE
+        _CRT_SECURE_NO_WARNINGS)
+    if(MSVC)
+        target_compile_options(utui_flow_tests PRIVATE
+            /std:c11 /W3 /utf-8)
+        target_link_options(utui_flow_tests PRIVATE
+            /guard:cf /DYNAMICBASE /NXCOMPAT)
+    else()
+        target_compile_options(utui_flow_tests PRIVATE
+            -Wall -Wextra -Wpedantic -pedantic-errors)
+    endif()
+    add_test(NAME utui_flow COMMAND utui_flow_tests)
+
     add_executable(symbol_resolver_tests
         tests/symbol_resolver_tests.c
         src/pe_scan.c
