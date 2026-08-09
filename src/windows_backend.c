@@ -1026,19 +1026,39 @@ static BOOL CALLBACK symbol_callback(
     ULONG symbol_size,
     PVOID user_context)
 {
-    static const wchar_t target_name[] =
+    static const wchar_t undecorated_name[] =
         L"CDesktopWatermark::s_DesktopBuildPaint";
+    static const wchar_t decorated_prefix[] =
+        L"?s_DesktopBuildPaint@CDesktopWatermark@@";
     SymbolSearch *search = (SymbolSearch *)user_context;
-    const ULONG target_length = (ULONG)(sizeof(target_name) / sizeof(target_name[0]) - 1);
+    const ULONG undecorated_length =
+        (ULONG)(sizeof(undecorated_name) / sizeof(undecorated_name[0]) - 1);
+    const ULONG prefix_length =
+        (ULONG)(sizeof(decorated_prefix) / sizeof(decorated_prefix[0]) - 1);
     DWORD64 delta;
     (void)symbol_size;
 
-    /* Some DbgHelp builds include the trailing NUL in NameLen. */
-    if (!((symbol->NameLen == target_length) ||
-          (symbol->NameLen == target_length + 1U &&
-           symbol->Name[target_length] == L'\0')) ||
-        wmemcmp(symbol->Name, target_name, target_length) != 0) {
-        return TRUE;
+    if (search->machine == IMAGE_FILE_MACHINE_ARM64) {
+        /*
+         * An ARM64X PDB can contain classic ARM64 and ARM64EC public symbols.
+         * DbgHelp undecorates both to the same name.  Match the classic symbol
+         * and reject the documented ARM64EC $$h decoration; ambiguity still
+         * fails closed below.
+         */
+        if (symbol->NameLen < prefix_length ||
+            wmemcmp(symbol->Name, decorated_prefix, prefix_length) != 0 ||
+            (symbol->NameLen >= prefix_length + 3U &&
+             wmemcmp(symbol->Name + prefix_length, L"$$h", 3U) == 0)) {
+            return TRUE;
+        }
+    } else {
+        /* Some DbgHelp builds include the trailing NUL in NameLen. */
+        if (!((symbol->NameLen == undecorated_length) ||
+              (symbol->NameLen == undecorated_length + 1U &&
+               symbol->Name[undecorated_length] == L'\0')) ||
+            wmemcmp(symbol->Name, undecorated_name, undecorated_length) != 0) {
+            return TRUE;
+        }
     }
     /* Stripped Microsoft PDBs expose executable functions as PublicCode. */
     if (symbol->Tag != UWD_SYMTAG_FUNCTION &&
@@ -1072,17 +1092,22 @@ static int resolve_cached_symbols(
     HANDLE symbol_process = GetCurrentProcess();
     DWORD64 module_base;
     DWORD previous_options;
+    DWORD symbol_options;
     SymbolSearch search;
     IMAGEHLP_MODULEW64 module_info;
     int result = -1;
 
     previous_options = SymGetOptions();
-    (void)SymSetOptions(
-        previous_options |
-        SYMOPT_UNDNAME |
+    symbol_options = previous_options |
         SYMOPT_EXACT_SYMBOLS |
         SYMOPT_FAIL_CRITICAL_ERRORS |
-        SYMOPT_SECURE);
+        SYMOPT_SECURE;
+    if (context->target_machine == IMAGE_FILE_MACHINE_ARM64) {
+        symbol_options &= ~(DWORD)SYMOPT_UNDNAME;
+    } else {
+        symbol_options |= SYMOPT_UNDNAME;
+    }
+    (void)SymSetOptions(symbol_options);
     if (!SymInitializeW(symbol_process, search_path, FALSE)) {
         (void)SymSetOptions(previous_options);
         return -1;
