@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.0.0-dev (2026)
+
+- Replaced the unreproducible Delphi/VCL installer as the primary UI with a
+  strict ISO C99 console application powered by the Universal-TUI module.
+- Replaced the default ExplorerFrame COM proxy with a fail-closed, current-
+  session memory backend. The legacy source remains for historical reference.
+- Added exact Microsoft-PDB resolution and live/disk byte verification. An
+  x64 structural locator is retained for diagnostics only after validation
+  demonstrated that a unique heuristic match can still be the wrong function.
+- Added x64 and ARM64 build targets, modern Windows version/architecture
+  detection, mitigation checks, SHA-256-protected session-scoped rollback
+  state, and reversible per-user startup.
+- Added CMake, PE-parser bounds tests, exact-PDB integration checks, and native
+  Windows x64/ARM64 GitHub Actions.
+- Added an authoritative `-std=c99 -pedantic-errors` CI gate; Visual Studio
+  remains a compatibility build because MSVC does not expose a C99 mode.
+- Fixed the Universal-TUI flow so a successful UWD Save exits and executes the
+  selected action, and mouse clicks honor the Exit result.
+
 ## 1.0.0.6 (2015)
 
 - Re-order initialize hooks.

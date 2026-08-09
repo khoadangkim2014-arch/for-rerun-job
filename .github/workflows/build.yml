@@ -1,0 +1,129 @@
+name: build
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  strict-c99:
+    name: Strict ISO C99 (MinGW x64)
+    runs-on: windows-2022
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Configure strict C99 build
+        shell: pwsh
+        run: |
+          $mingwBin = @(
+            "C:\mingw64\bin",
+            "C:\msys64\mingw64\bin"
+          ) | Where-Object {
+            (Test-Path "$_\gcc.exe") -and (Test-Path "$_\windres.exe")
+          } | Select-Object -First 1
+          if (!$mingwBin) {
+            throw "The pinned windows-2022 image does not contain MinGW-w64."
+          }
+          $env:PATH = "$mingwBin;$env:PATH"
+          $mingwBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $gcc = "$mingwBin\gcc.exe"
+          $windres = "$mingwBin\windres.exe"
+          cmake -S . -B build-c99 -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_C_COMPILER:FILEPATH=$gcc `
+            -DCMAKE_RC_COMPILER:FILEPATH=$windres `
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON `
+            -DBUILD_TESTING=ON
+
+      - name: Verify strict C99 flags
+        shell: pwsh
+        run: |
+          $commands = Get-Content .\build-c99\compile_commands.json -Raw
+          if (!$commands.Contains("-std=c99") -or
+              !$commands.Contains("-pedantic-errors") -or
+              $commands.Contains("-std=gnu99")) {
+            throw "CMake did not generate a strict ISO C99 build."
+          }
+
+      - name: Build in strict C99 mode
+        run: cmake --build build-c99 --parallel
+
+      - name: Run strict C99 tests
+        run: ctest --test-dir build-c99 --output-on-failure
+
+      - name: Scan runner shell32.dll (read-only)
+        shell: pwsh
+        run: >-
+          & .\build-c99\pe_scan_tests.exe
+          "$env:WINDIR\System32\shell32.dll"
+
+      - name: Validate exact Microsoft PDB symbol (read-only)
+        shell: pwsh
+        run: >-
+          & .\build-c99\symbol_resolver_tests.exe
+          "$env:WINDIR\System32\shell32.dll"
+
+  build:
+    name: Windows ${{ matrix.architecture }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x64
+            runner: windows-2022
+          - architecture: ARM64
+            runner: windows-11-arm
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build
+          -G "Visual Studio 17 2022"
+          -A ${{ matrix.architecture }}
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Run bounds tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Scan runner shell32.dll (read-only)
+        shell: pwsh
+        run: >-
+          & .\build\Release\pe_scan_tests.exe
+          "$env:WINDIR\System32\shell32.dll"
+
+      - name: Validate exact Microsoft PDB symbol (read-only)
+        shell: pwsh
+        run: >-
+          & .\build\Release\symbol_resolver_tests.exe
+          "$env:WINDIR\System32\shell32.dll"
+
+      - name: Stage package
+        shell: pwsh
+        run: |
+          cmake --install build --config Release --prefix "package"
+          Copy-Item LICENSE, README.md, README.ja.md, THIRD_PARTY_NOTICES.md -Destination package
+
+      - name: Upload package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: uwd-${{ matrix.architecture }}
+          path: package
+          if-no-files-found: error
+          retention-days: 14

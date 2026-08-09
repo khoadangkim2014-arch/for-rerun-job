@@ -1,29 +1,162 @@
-# Universal Watermark Disabler
-Removes watermarks strings in Windows 10, Windows 8.1 and Windows 8 ([Preview](docs/preview.md)).
+# Universal Watermark Disabler 2
 
-![main window](docs/mainwindow.png)
+[日本語](README.ja.md)
 
-## About source
-This utility was written by me in 2015, but only now I have published its source code.
+This fork modernizes Painter701's 2015 Universal Watermark Disabler for current
+Windows 10 and Windows 11 builds. Its primary interface is the embedded
+[Universal-TUI](third_party/universal-tui/README.md) module.
 
-## Features
-- Removes watermark strings: BootSecure, Test Mode, Build string in evaluation and pre-release builds, "Confidential" warning text and even the build hash (for internal builds).
-- Supports all builds from Windows 8 7850 to Windows 10 10240 (and newer).
-- Supports any UI language.
-- Does not delete branding strings (i.e. does not modify system files: work as proxy/injector).
+> [!IMPORTANT]
+> This is a development preview, not a finished release. The default resolver
+> fails closed unless Microsoft symbols identify the exact function. Always run
+> Diagnostics or Dry run before Apply on a new Windows flight.
 
-## How does it work?
-Short answer: COM-hijacking and DLL-Proxying with inject a DLL into the ExplorerFrame.
+## Scope
 
-You can also read the article is about how this utils was researched: [Reverse-engineered the Universal Watermark Disabler](https://github.com/0xda568/Universal-Watermark-Disabler-Reverse-Engineering).
+The modern backend targets the Insider/evaluation desktop build text rendered
+by `shell32!CDesktopWatermark::s_DesktopBuildPaint`.
 
-## Issues
-The legacy implementation is incompatible with StartIsBack.
+- It **does not** remove the "Activate Windows" watermark.
+- It does not activate Windows or change licensing state.
+- It intentionally leaves Test Mode, Safe Mode, Secure Boot, and security
+  warnings alone.
+- It never replaces Windows files, changes a system COM registration, takes
+  ownership of a registry key, or weakens an ACL.
 
-## History
-In the far far past I was interested in beta versions of Windows, but the non-disable watermark in them did not allow me to make a beautiful screenshot, so I had the idea to remove the watermark.
+There is no supported Windows API for hiding this private shell UI. This tool is
+therefore inherently version-sensitive. Unknown or ambiguous targets are
+rejected without changing memory.
 
-Some of [changelog](docs/changelog.md).
+## What changed from the 2015 release
 
-## Special thanks
-Special thanks to my old friend Tihiy - author of the [StartIsBack](https://www.StartIsBack.com/) project.
+The original Delphi installer and ExplorerFrame proxy remain in `installer/`
+and `proxy/` for historical reference only. They are excluded from the modern
+build. The new implementation:
+
+- uses a strict ISO C99 console executable and Universal-TUI as the main UI;
+- reads the real OS build with `RtlGetVersion` and the process architecture with
+  `IsWow64Process2`;
+- identifies the current session's Explorer and its loaded `shell32.dll` rather
+  than assuming a path or process;
+- requires an exact Microsoft PDB GUID/age and symbol, then verifies that the
+  loaded PE identity and target bytes match the on-disk module;
+- can report an experimental x64 structural candidate for diagnostics, but
+  never uses that heuristic for Apply;
+- opens Explorer with only query/read/write/VM-operation rights instead of
+  `PROCESS_ALL_ACCESS`;
+- saves the original instruction bytes before changing memory and restores only
+  when the PID, image identity, RVA, and current bytes still match;
+- restores executable page protection, preserves CFG call-target metadata, and
+  flushes the instruction cache;
+- checks Explorer's dynamic-code mitigation and never disables a protection;
+- offers reversible per-user startup through `HKCU` only.
+
+The memory change is temporary. Restarting Explorer or signing out removes it.
+
+## Target matrix
+
+The code targets native x64 and ARM64 builds with NT build 19041 or newer. The
+compatibility target list (not a claim that every combination is validated on
+every commit) is:
+
+- Windows 10 22H2 / ESU (19045) and LTSC 2021 (19044), x64;
+- Windows 11 23H2 (22631), 24H2/LTSC 2024 (26100), and 25H2 (26200), x64/ARM64;
+- Windows 11 26H1 (28000 family), x64/ARM64 where available;
+- current Insider branches, including parallel 262xx/263xx/280xx families.
+
+Build numbers are diagnostics, not a compatibility shortcut. The exact
+`shell32.dll` image, PDB GUID/age, exact symbol, executable range, and live
+bytes decide whether Apply is allowed. Apply is symbol-only on both x64 and
+ARM64; the experimental offline candidate is x64 diagnostics only.
+
+## Build
+
+Requirements:
+
+- Visual Studio 2022 with the Desktop development with C++ workload;
+- Windows 10/11 SDK;
+- CMake 3.24 or newer.
+
+The source-language contract is strict ISO C99. GNU and Clang GNU-driver builds
+disable language extensions and treat ISO violations as errors with
+`-std=c99 -pedantic-errors`. MSVC does not provide a C99 mode, so Visual Studio
+uses `/std:c11` only as its narrowest conforming C front end; the dedicated
+MinGW CI build is the C99 conformance gate. The project does not use C11
+features.
+
+```powershell
+cmake -S . -B build -A x64
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
+```
+
+For ARM64, configure with `-A ARM64`. GitHub Actions runs a strict ISO C99
+MinGW build plus native MSVC x64 and ARM64 builds. All execute the PE bounds
+tests and inspect their own `shell32.dll` read-only, including exact
+Microsoft-PDB symbol resolution.
+Release qualification on the target Windows families still requires
+real-machine Diagnostics and Dry run checks.
+
+## Use
+
+Run `uwd.exe` in Windows Terminal or conhost. Select an action, review the
+resolver settings, and choose **Save** to execute. Exit without saving cancels.
+
+Useful non-interactive commands:
+
+```text
+uwd.exe --diagnostics
+uwd.exe --apply --dry-run
+uwd.exe --apply
+uwd.exe --restore
+uwd.exe --enable-startup
+uwd.exe --disable-startup
+```
+
+If a brand-new Insider flight's PDB is not available yet, Apply fails safely.
+On x64, maintainers can inspect the experimental heuristic candidate with:
+
+```text
+uwd.exe --diagnostics --experimental-offline-scan
+```
+
+The candidate is never used for Apply. During development on Windows build
+26300 with `shell32.dll` 26100.8951, the heuristic produced a unique but wrong
+RVA when compared with Microsoft's exact PDB. That validation is why symbol
+identity is mandatory rather than merely preferred.
+
+Diagnostics may download and cache the exact Microsoft PDB. `--offline` never
+contacts the symbol server. `--dry-run` uses an existing cache only and makes no
+memory, registry, state, or cache change.
+
+Runtime state and the Universal-TUI config are stored under:
+
+```text
+%LOCALAPPDATA%\UniversalWatermarkDisabler
+```
+
+Rollback records are integrity-checked and scoped by interactive session so
+multi-session Windows hosts cannot overwrite another session's recovery data.
+
+## Universal-TUI module
+
+`third_party/universal-tui` is a pinned vendored module from
+`ayanami770/Universal-TUI` commit
+`419fef2e89e68873fe969ecbdb02d8cfa2331ba3`. The upstream repository is
+currently private. Vendoring keeps this public fork and its CI reproducible.
+The source carries marked local fixes for opt-in Save-and-exit behavior and
+mouse Exit propagation; these changes should be upstreamed before converting
+the directory to a pinned git submodule.
+
+Universal-TUI is Apache-2.0 licensed. See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the component's
+[LICENSE](third_party/universal-tui/LICENSE).
+
+## Acknowledgements and license
+
+The repository is MIT licensed. The modern implementation keeps the original
+project history and credits. Its diagnostics-only structural locator is inspired by
+the MIT-licensed [UWD3](https://github.com/jcnnik/uwd3); no AGPL UWD2 source was
+copied.
+
+See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
