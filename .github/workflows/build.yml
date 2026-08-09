@@ -1,0 +1,68 @@
+name: build
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Windows ${{ matrix.architecture }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x64
+            runner: windows-latest
+          - architecture: ARM64
+            runner: windows-11-arm
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build
+          -G "Visual Studio 17 2022"
+          -A ${{ matrix.architecture }}
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Run bounds tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Scan runner shell32.dll (read-only)
+        shell: pwsh
+        run: >-
+          & .\build\Release\pe_scan_tests.exe
+          "$env:WINDIR\System32\shell32.dll"
+
+      - name: Validate exact Microsoft PDB symbol (read-only)
+        shell: pwsh
+        run: >-
+          & .\build\Release\symbol_resolver_tests.exe
+          "$env:WINDIR\System32\shell32.dll"
+
+      - name: Stage package
+        shell: pwsh
+        run: |
+          cmake --install build --config Release --prefix "package"
+          Copy-Item LICENSE, README.md, README.ja.md, THIRD_PARTY_NOTICES.md -Destination package
+
+      - name: Upload package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: uwd-${{ matrix.architecture }}
+          path: package
+          if-no-files-found: error
+          retention-days: 14
